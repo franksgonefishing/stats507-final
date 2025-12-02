@@ -1,6 +1,6 @@
 import plotly.graph_objects as go
 
-
+# shared function to filter the dataframe shown in the dashboard visuals
 def filter_df(df, month_range=None, day_range=None, network_selection=None, news_category_selection=None, headline_contains=None, include_generated_headlines=False):
 
     if month_range:
@@ -24,6 +24,7 @@ def filter_df(df, month_range=None, day_range=None, network_selection=None, news
     return df
 
 
+# function to present an error message if something goes wrong with any of the visuals in the dashboard
 def error_fig(error_msg):
     fig = go.Figure()
 

@@ -1,3 +1,6 @@
+# Collection of hard coded constants that might be used in multiple locations so hard coding 
+# them all in a shared spot to simplify the process if I were to change any of them
+
 NEWS_CATEGORIES = ["politics", "sports", "business", "entertainment", "technology", "health"]
 
 BREITBART_CATEGORY_LIST = [
