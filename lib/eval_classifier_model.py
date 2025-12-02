@@ -1,0 +1,93 @@
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from lib.hard_coded_constants import NEWS_CATEGORIES
+
+import torch
+import torch.nn.functional as F
+import pandas as pd
+import numpy as np
+
+
+def general_headline_classifier(model_name, category_name, headlines, indexes, classification_categories=NEWS_CATEGORIES, batch_size=32, is_zeroshot=True):
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    classifier_model = AutoModelForSequenceClassification.from_pretrained(model_name)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    classifier_model.to(device)
+    print(f"running on device: {device}")
+    classifier_model.eval()  # make sure model is in eval mode
+
+    num_batches = (len(headlines) + batch_size - 1) // batch_size
+    print(f"processing {len(headlines)} headlines in {num_batches} batches")
+
+    classified_dfs = []
+
+    for i in range(num_batches):
+        print(f"starting batch {i + 1}/{num_batches}")
+
+        start = i * batch_size
+        end = min(start + batch_size, len(headlines))
+        batch_headlines = headlines[start:end]
+        batch_indexes = indexes[start:end]
+
+        # Repeat each headline for all categories
+        if is_zeroshot:
+            repeated_headlines = np.repeat(batch_headlines, len(classification_categories)).tolist()
+            repeated_categories = classification_categories * len(batch_headlines)
+
+            inputs = tokenizer(
+                repeated_headlines,
+                repeated_categories,
+                return_tensors="pt",
+                padding=True,
+                truncation=True
+            ).to(device)
+
+            with torch.no_grad():
+                logits = classifier_model(**inputs).logits
+
+            entailment_scores = logits[:, 2]  # assume class 2 is entailment
+            entailment_scores = entailment_scores.view(len(batch_headlines), len(classification_categories))
+            probs = F.softmax(entailment_scores, dim=1)
+
+            # Convert the tensor to a numpy array first
+            probs_np = probs.cpu().numpy()  # shape (B, C)
+        else:
+            inputs = tokenizer(
+                batch_headlines,
+                return_tensors="pt",
+                padding=True,
+                truncation=True
+            ).to(device)
+
+            with torch.no_grad():
+                logits = classifier_model(**inputs).logits  # shape: (B, C)
+
+            probs = F.softmax(logits, dim=1)  # softmax over classes
+            probs_np = probs.cpu().numpy()
+            classification_categories = [classifier_model.config.id2label[i] for i in range(classifier_model.config.num_labels)]
+
+        # Create DataFrame directly
+        df = pd.DataFrame(probs_np, columns=classification_categories)
+        df[category_name] = df[classification_categories].idxmax(axis=1)
+        # Add the headlines as a column
+        df["headline"] = batch_headlines
+        df["index"] = batch_indexes
+
+        classified_dfs.append(df)
+
+    # Concatenate all classified DataFrames
+    combined_classified_df = pd.concat(classified_dfs)
+
+    return combined_classified_df
+
+
+def map_values_into_data_df(data_df, classified_df, col_to_map):
+    # Create a Series from the mapping: index -> value
+    mapped_series = pd.Series(classified_df[col_to_map].values, index=classified_df["index"])
+    # If the column doesn't exist, create it with NaN
+    if col_to_map not in data_df.columns:
+        data_df[col_to_map] = None
+    # Align with complete_df and fill missing values with existing ones
+    data_df[col_to_map] = mapped_series.reindex(data_df.index).combine_first(data_df[col_to_map])
+
+    return data_df
