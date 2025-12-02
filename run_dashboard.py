@@ -3,13 +3,11 @@ from dash import Dash, html, dcc, callback, Output, Input, State
 from lib.hard_coded_constants import DATA_FILE_NAME, IGNORE_NGRAMS_FILE_NAME, NEWS_CATEGORIES, ADDITIONAL_STOP_WORDS, NEWS_SITES_BASE_URL, NEWS_SITE_COLORS, EMOTION_CATEGORIES, GENERATED_HEADLINES_FILE_NAME
 from lib.dashboard_functions import filter_df, error_fig
 
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.feature_extraction import text 
 from sklearn.utils._param_validation import InvalidParameterError
 
-from scipy.stats import ks_2samp
-from scipy.stats import chi2_contingency, fisher_exact
+from scipy.stats import ks_2samp, chi2_contingency
 
 import prince
 import warnings
@@ -863,7 +861,7 @@ def update_output(n_clicks, removed_ngram):
     Input(component_id="submit-ngram-for-ignore", component_property="n_clicks")
 )
 def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams, n_gram_value, n_gram_occurrence_filter, headline_filter, include_generated_headlines, filler):
-    stop_words = list(text.ENGLISH_STOP_WORDS.union(ADDITIONAL_STOP_WORDS))
+    stop_words = list(ENGLISH_STOP_WORDS.union(ADDITIONAL_STOP_WORDS))
     n_gram_occurrence_filter = n_gram_occurrence_filter or 5
     if ignore_preselected_ngrams:
         IGNORE_NGRAMS = np.array(pd.read_csv(IGNORE_NGRAMS_FILE_NAME)["ignored_ngrams"])

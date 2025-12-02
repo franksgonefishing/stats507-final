@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import pandas as pd
 
 
+# finds the VADER sentiment score for each headline
 def find_pos_neg_neu_sentiment(news_site, year, month, day=None, use_generated_headlines=False):
     if use_generated_headlines:
         data_set = GENERATED_HEADLINES_FILE_NAME
@@ -16,20 +17,14 @@ def find_pos_neg_neu_sentiment(news_site, year, month, day=None, use_generated_h
         data_set = DATA_FILE_NAME
 
     print(f"finding pos_neg_neu sentiment for {news_site} headlines on {year}-{month}{'-' + str(day) if day else ''}")
-    # relative path that works when run by the file in final_project
     complete_df = pd.read_csv(data_set, low_memory=False)
-    # Base conditions
-    mask = (complete_df["network"] == news_site) & (complete_df["year"] == year) & (complete_df["month"] == month)
-    # Add the optional condition only if day exists
-    if day:
-        mask &= (complete_df["day"] == day)
 
-    selected_indices = complete_df[mask].index.to_list()
-    headlines = complete_df[mask]["headline"].to_list()
+    headlines, selected_indices = find_filtered_headlines_and_indices(complete_df, news_site, year, month, day)
 
     if len(headlines) == 0:
         print(f"found no headlines for {news_site} headlines on {year}-{month}{'-' + str(day) if day else ''}")
         return
+    
     # Initialize VADER sentiment analyzer
     sid = SentimentIntensityAnalyzer()
 
@@ -55,6 +50,7 @@ def find_pos_neg_neu_sentiment(news_site, year, month, day=None, use_generated_h
     print(f"added {len(headlines)} pos_neg_neu sentiments for {news_site} headlines on {year}-{month}{'-' + str(day) if day else ''}")
 
 
+# finds the primary and secondary emotion present in each headline
 def find_emotion_sentiment(news_site, year, month, day=None, use_generated_headlines=False):
     if use_generated_headlines:
         data_set = GENERATED_HEADLINES_FILE_NAME
@@ -62,22 +58,14 @@ def find_emotion_sentiment(news_site, year, month, day=None, use_generated_headl
         data_set = DATA_FILE_NAME
 
     print(f"finding emotion sentiment for {news_site} headlines on {year}-{month}{'-' + str(day) if day else ''}")
-    # relative path that works when run by the file in final_project
     complete_df = pd.read_csv(data_set, low_memory=False)
-    # Base conditions
-    mask = (complete_df["network"] == news_site) & (complete_df["year"] == year) & (complete_df["month"] == month)
-    # Add the optional condition only if day exists
-    if day:
-        mask &= (complete_df["day"] == day)
 
-    selected_indices = complete_df[mask].index.to_list()
-    headlines = complete_df[mask]["headline"].to_list()
+    headlines, selected_indices = find_filtered_headlines_and_indices(complete_df, news_site, year, month, day)
     
     if len(headlines) == 0:
         print(f"found no headlines for {news_site} on {year}-{month}{'-' + str(day) if day else ''}")
         return
 
-    # Concatenate all classified DataFrames
     combined_classified_df = general_headline_classifier(
         EMOTION_ANALYSIS_CLASSIFICATION_MODEL, 
         "primary_emotion", 
@@ -85,12 +73,12 @@ def find_emotion_sentiment(news_site, year, month, day=None, use_generated_headl
         selected_indices,
         is_zeroshot=False
     )
-    #also want to find secondary emotion
+    #also want to find secondary emotion just in case it's interesting
     combined_classified_df["secondary_emotion"] = (
         combined_classified_df[EMOTION_CATEGORIES]
         .apply(lambda row: row.nlargest(2).index[1], axis=1)
     )
-    # For each category, align by index and fill missing values with original column values
+    # For each emotion category, align by index and fill missing values with original column values
     for cat in EMOTION_CATEGORIES:
         complete_df = map_values_into_data_df(complete_df, combined_classified_df, cat)
     # one more time for overall category based on highest probability
@@ -100,3 +88,17 @@ def find_emotion_sentiment(news_site, year, month, day=None, use_generated_headl
     print(f"Finished processing {len(headlines)} headlines")
     
     complete_df.to_csv(data_set, index=False)
+
+
+# general function to avoid code duplication
+def find_filtered_headlines_and_indices(df, news_site, year, month, day):
+    # filtering for specific set of headlines
+    # Base conditions
+    mask = (df["network"] == news_site) & (df["year"] == year) & (df["month"] == month)
+    # Add the optional condition only if day exists, MSNBC and Newsmax don't use day
+    if day:
+        mask &= (df["day"] == day)
+    selected_indices = df[mask].index.to_list()
+    headlines = df[mask]["headline"].to_list()
+
+    return headlines, selected_indices
