@@ -19,7 +19,7 @@ Please ensure that the following packages are installed for everything to run pr
 * transformers
 
 ## Running the Tools
-Please see below for instructions for each tool. Please run everything from the final_project directory.
+Please see below for instructions for each tool. Please run everything from the stats507-final directory.
 
 ### Scraper
 Runs the scraper that adds headlines to data/headlines_data.csv. <br> <br>
