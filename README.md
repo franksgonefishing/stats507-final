@@ -81,7 +81,7 @@ example:
 * Look for a message similar to: 'Dash is running on http://127.0.0.1:8050/'
 
 ### fine_tune_language_model.ipynb
-Notebook that fine-tunes language models for all the news networks and generates headlines based on the fine-tuned models. No need to make any changes, "run all" should work.
+Notebook that fine-tunes language models for all the news networks and generates headlines based on the fine-tuned models. No need to make any changes, "run all" should work. Should take ~20 minutes on CPU.
 
 ## Other Notes
 For the scraper, some of the networks require opening a chromium browser to find the html. Sometimes the bot protection kicks in chromium doesn't direct to the page with the headline html. When this happens just try running the scraper again later.
