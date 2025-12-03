@@ -25,7 +25,7 @@ def format_request(news_site, year, month, day=None):
     elif news_site == "USAToday":
         extension = f"{year}/{INT_TO_MONTH_DICT[month]}/{day}/"
     elif news_site == "Washpost":
-        extension = f"{year}/{INT_TO_MONTH_DICT[month]}/{day}"
+        extension = f"{year}/{month}/{day}"
     elif news_site == "WSJ":
         extension = f"{year}/{month:02d}/{day:02d}"
     else:
