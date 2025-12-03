@@ -10,6 +10,7 @@ from sklearn.utils._param_validation import InvalidParameterError
 from scipy.stats import ks_2samp, chi2_contingency
 
 import prince
+import warnings
 
 import plotly.express as px
 import plotly.figure_factory as ff
@@ -665,15 +666,18 @@ def update_emotion_network_selector(include_generated_headlines):
     prevent_initial_call=True
 )
 def remove_inputted_ngram(_, removed_ngram, current_data):
-    if removed_ngram == "":
-        return current_data + 1, "", ""
-    else:
-        ngram_ignore_df = pd.read_csv(IGNORE_NGRAMS_FILE_NAME)
-        new_ngram = pd.DataFrame({"ignored_ngrams": [removed_ngram]})
-        ngram_ignore_df = pd.concat([ngram_ignore_df, new_ngram])
-        ngram_ignore_df.to_csv(IGNORE_NGRAMS_FILE_NAME, index=False)
+    if removed_ngram:
+        if removed_ngram.strip() == "":
+            return current_data + 1, "", ""
+        else:
+            ngram_ignore_df = pd.read_csv(IGNORE_NGRAMS_FILE_NAME)
+            new_ngram = pd.DataFrame({"ignored_ngrams": [removed_ngram]})
+            ngram_ignore_df = pd.concat([ngram_ignore_df, new_ngram])
+            ngram_ignore_df.to_csv(IGNORE_NGRAMS_FILE_NAME, index=False)
 
-        return current_data + 1, f"added '{removed_ngram}' to {IGNORE_NGRAMS_FILE_NAME}", ""
+            return current_data + 1, f"added '{removed_ngram}' to {IGNORE_NGRAMS_FILE_NAME}", ""
+    else:
+        return current_data + 1, "", ""
 
 
 ##########################################################################################
@@ -764,11 +768,15 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     P = pd.DataFrame(P.toarray())
 
     try:
-        ca = prince.CA(n_components=2)
-        ca = ca.fit(P)
+        with warnings.catch_warnings():
+            # prince pops some runtime warnings due to very small values in the matrix sometimes
+            # those ngrams don't end up influencing the overall visualization so hiding the warnings
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            ca = prince.CA(n_components=2)
+            ca = ca.fit(P)
 
-        row_coords = ca.row_coordinates(P)
-        col_coords = ca.column_coordinates(P)
+            row_coords = ca.row_coordinates(P)
+            col_coords = ca.column_coordinates(P)
     except:
         # sometimes an error can pop up if there's only one network remaining even when the earlier checks don't pop an error
         return error_fig("Too few n-grams to analyze")
