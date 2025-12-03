@@ -10,7 +10,6 @@ from sklearn.utils._param_validation import InvalidParameterError
 from scipy.stats import ks_2samp, chi2_contingency
 
 import prince
-import warnings
 
 import plotly.express as px
 import plotly.figure_factory as ff
@@ -762,15 +761,11 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     P = pd.DataFrame(P.toarray())
 
     try:
-        with warnings.catch_warnings():
-            # prince pops some runtime warnings due to very small values in the matrix sometimes
-            # those ngrams don't end up influencing the overall visualization so hiding the warnings
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            ca = prince.CA(n_components=2)
-            ca = ca.fit(P)
+        ca = prince.CA(n_components=2)
+        ca = ca.fit(P)
 
-            row_coords = ca.row_coordinates(P)
-            col_coords = ca.column_coordinates(P)
+        row_coords = ca.row_coordinates(P)
+        col_coords = ca.column_coordinates(P)
     except:
         # sometimes an error can pop up if there's only one network remaining even when the earlier checks don't pop an error
         return error_fig("Too few n-grams to analyze")
