@@ -952,9 +952,8 @@ def update_sentiment_graph(month_range, news_category_selection, network_selecti
     fig.update_layout(title="Sentiment Density Distribution Plot")
     fig.update_yaxes(visible=False)
     # Add custom hover text to rug traces
-    # Rug traces are usually the last 'len(networks)' traces in the figure
     for i, network in enumerate(networks):
-        rug_trace_index = -len(networks) + i  # Get correct trace
+        rug_trace_index = -len(networks) + i
         rug_headlines = filtered_df[filtered_df["network"] == network]["headline"]
 
         fig.data[rug_trace_index].text = rug_headlines
