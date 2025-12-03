@@ -5,7 +5,6 @@ from lib.dashboard_functions import filter_df, error_fig, p_val_colors
 
 from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.utils._param_validation import InvalidParameterError
 
 from scipy.stats import ks_2samp, chi2_contingency
 
