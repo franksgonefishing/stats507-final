@@ -657,7 +657,7 @@ def update_emotion_network_selector(include_generated_headlines):
 
 # controls for the tool that helps remove ngrams from the analysis for the Correspondence Analysis tab
 @callback(
-    Output("refresh-ca-store", "data"),  # new output
+    Output("refresh-ca-store", "data"),
     Output("container-button-basic", "children"),
     Output("input-on-submit", "value"),
     Input("submit-ngram-for-ignore", "n_clicks"),
