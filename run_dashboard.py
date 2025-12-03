@@ -713,23 +713,27 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     if len(filtered_df) == 0:
         return error_fig("No data available")
 
-    # get the ngrams from the headlines
-    vectorizer = CountVectorizer(
-        ngram_range=(n_gram_value[0], n_gram_value[1]),
-        stop_words=list(ENGLISH_STOP_WORDS), 
-        min_df=n_gram_occurrence_filter
-    )
-    # X is a matrix of headlines on one axis, ngrams on the other axis
-    X = vectorizer.fit_transform(filtered_df["headline"])
+    try:
+        # get the ngrams from the headlines
+        vectorizer = CountVectorizer(
+            ngram_range=(n_gram_value[0], n_gram_value[1]),
+            stop_words=list(ENGLISH_STOP_WORDS), 
+            min_df=n_gram_occurrence_filter
+        )
+        # X is a matrix of headlines on one axis, ngrams on the other axis
+        X = vectorizer.fit_transform(filtered_df["headline"])
+    except ValueError:
+        # sometimes there are headlines and ngrams but the results are all lower than min_df
+        return error_fig("Too few n-grams to analyze")
     
     # remove ngrams that are in ignore_these_ngrams.csv
     # some ngrams are unique to networks because they are self-referential
     # or some standard label, like "fox news digital"
     # these ngrams skew uniqueness for each network so the analysis is better when removed
     feature_names = vectorizer.get_feature_names_out()
-    mask = np.isin(feature_names, IGNORE_NGRAMS, invert=True)
-    X = X[:, mask]
-    feature_names = feature_names[mask]
+    filter_ngrams = np.isin(feature_names, IGNORE_NGRAMS, invert=True)
+    X = X[:, filter_ngrams]
+    feature_names = feature_names[filter_ngrams]
 
     # the same as groupby
     # groups ngram usage by network, original X matrix is ngrams by headline
@@ -743,45 +747,35 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     col_sums = np.asarray(CT.sum(axis=0)).flatten()
     nonzero_cols = col_sums > 0
 
+    # there could be too few n-grams post filtering of n-grams above
     if nonzero_cols.sum() == 0:
-        return error_fig("No networks with data available")
+        return error_fig("Too few n-grams to analyze")
 
-    # Apply mask
-    CT = CT[:, nonzero_cols]                  # keep only usable networks
+    # removes networks that end up having 0 ngrams across the board
+    CT = CT[:, nonzero_cols]
     network_names = network_names[nonzero_cols]
-    # ---------------------------------------------------------------------------
-
-    # ---------------------------------------------------------------------------
-    # OPTIONAL: Remove n-grams (rows) that appear nowhere after filtering
-    # (Sometimes min_df or ignoring removes everything for that term)
-    # ---------------------------------------------------------------------------
-    row_sums = np.asarray(CT.sum(axis=1)).flatten()
-    nonzero_rows = row_sums > 0
-
-    if nonzero_rows.sum() == 0:
-        return error_fig("No n-grams satisfy your filters")
-
-    CT = CT[nonzero_rows, :]
-    feature_names = feature_names[nonzero_rows]
 
     n_total = CT.sum()
 
-    # Step 1: relative frequencies
+    # relative frequencies, full contingency table
     P = CT / n_total
     P = pd.DataFrame(P.toarray())
 
     try:
         with warnings.catch_warnings():
+            # prince pops some runtime warnings due to very small values in the matrix sometimes
+            # those ngrams don't end up influencing the overall visualization so hiding the warnings
             warnings.simplefilter("ignore", category=RuntimeWarning)
             ca = prince.CA(n_components=2)
             ca = ca.fit(P)
 
             row_coords = ca.row_coordinates(P)
             col_coords = ca.column_coordinates(P)
-    except InvalidParameterError:
-        error_fig("Too few headlines available for analysis")
+    except:
+        # sometimes an error can pop up if there's only one network remaining even when the earlier checks don't pop an error
+        return error_fig("Too few n-grams to analyze")
 
-    # preferred reference network, will anchor this to always be in the top left quadrant
+    # will anchor this to always be in the top left quadrant
     # keeps the graph stabalized
     preferred_ref = "NYT"
 
@@ -793,56 +787,53 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
 
     ref_idx = np.where(network_names == network_ref)[0][0]
 
-    # Get the reference coordinates
+    # get the reference coordinates
     ref_x = col_coords.iloc[ref_idx, 0]
     ref_y = col_coords.iloc[ref_idx, 1]
 
-    # Flip x-axis if ref_x > 0 (we want it negative for left)
+    # flip x-axis if ref_x > 0
     if ref_x > 0:
         col_coords.iloc[:, 0] *= -1
         row_coords.iloc[:, 0] *= -1
 
-    # Flip y-axis if ref_y < 0 (we want it positive for top)
+    # flip y-axis if ref_y < 0
     if ref_y < 0:
         col_coords.iloc[:, 1] *= -1
         row_coords.iloc[:, 1] *= -1
 
-    # Define colors
-    base_color = "#E41A1C"        # red (for original networks)
-    generated_color = "#377EB8"   # blue (colorblind-friendly distinct color)
-
-    # Compute max distance from origin for column and row coordinates
-    col_max = np.max(np.sqrt(col_coords.iloc[:,0]**2 + col_coords.iloc[:,1]**2))
-    row_max = np.max(np.sqrt(row_coords.iloc[:,0]**2 + row_coords.iloc[:,1]**2))
-
-    # Scale row_coords so their max distance is slightly less than col_coords
-    scale_factor = 0.8 * col_max / row_max  # 0.8 = 80% of column radius
+    # scale ngram points so that no ngram point is further than the furthest network point
+    # helps with the graph visualization
+    # compute max distance from origin for column and row coordinates
+    col_max = np.max(np.sqrt(col_coords.iloc[:, 0] ** 2 + col_coords.iloc[:, 1] ** 2))
+    row_max = np.max(np.sqrt(row_coords.iloc[:, 0] ** 2 + row_coords.iloc[:, 1] ** 2))
+    scale_factor = 0.8 * col_max / row_max
     row_coords_scaled = row_coords.copy()
-    row_coords_scaled.iloc[:,0] *= scale_factor
-    row_coords_scaled.iloc[:,1] *= scale_factor
+    row_coords_scaled.iloc[:, 0] *= scale_factor
+    row_coords_scaled.iloc[:, 1] *= scale_factor
 
+    # create separate colored points for generated networks vs base networks
+    # Define colors for base networks vs generated networks
+    base_color = "#E41A1C"
+    generated_color = "#377EB8"
     # Boolean mask for which points are generated
-    is_generated = [("_generated" in name) for name in network_names]
-
+    is_generated = np.array([("_generated" in name) for name in network_names])
     # Split the data
     x_gen = col_coords.iloc[:, 0][is_generated]
     y_gen = col_coords.iloc[:, 1][is_generated]
     text_gen = [name for name in network_names if "_generated" in name]
-
-    x_base = col_coords.iloc[:, 0][~pd.Series(is_generated)]
-    y_base = col_coords.iloc[:, 1][~pd.Series(is_generated)]
+    x_base = col_coords.iloc[:, 0][~is_generated]
+    y_base = col_coords.iloc[:, 1][~is_generated]
     text_base = [name for name in network_names if "_generated" not in name]
 
     fig = go.Figure()
-
     # --- TRACE 1: Generated ---
     fig.add_trace(go.Scatter(
         x=x_gen,
         y=y_gen,
-        mode='markers+text',
+        mode="markers+text",
         text=text_gen,
-        hoverinfo='text',
-        textposition='top center',
+        hoverinfo="text",
+        textposition="top center",
         marker=dict(size=10, color=generated_color),
         name='generated_headlines',
     ))
@@ -851,12 +842,12 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     fig.add_trace(go.Scatter(
         x=x_base,
         y=y_base,
-        mode='markers+text',
+        mode="markers+text",
         text=text_base,
-        hoverinfo='text',
-        textposition='top center',
+        hoverinfo="text",
+        textposition="top center",
         marker=dict(size=10, color=base_color),
-        name='headlines',
+        name="headlines",
     ))
 
     if show_ngrams:
@@ -895,16 +886,16 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
             xanchor="right"
         ),
         xaxis=dict(
-            showgrid=False,       # removes vertical grid lines
-            zeroline=False,       # removes x=0 line
-            showticklabels=False, # hides tick labels
-            ticks="",              # removes tick marks
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            ticks="",
         ),
         yaxis=dict(
-            showgrid=False,       # removes horizontal grid lines
-            zeroline=False,       # removes y=0 line
-            showticklabels=False, # hides tick labels
-            ticks="",              # removes tick marks
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            ticks="",
         ),
         margin=dict(l=50, r=50, t=0, b=0),
         width=800,
@@ -946,7 +937,12 @@ def update_sentiment_graph(month_range, news_category_selection, network_selecti
     data = [filtered_df[filtered_df["network"] == network]["vader_compound_score"] for network in networks]
     colors = [NEWS_SITE_COLORS[network] for network in networks]
 
-    fig = ff.create_distplot(data, networks, show_hist=False, colors=colors)
+    try:
+        fig = ff.create_distplot(data, networks, show_hist=False, colors=colors)
+    except:
+        # error pops up when filtering too specifically on a certain headline
+        return error_fig("too few headlines to form a distribution (a network might only have 1 headline)")
+
     fig.update_layout(title="Sentiment Density Distribution Plot")
     fig.update_yaxes(visible=False)
     # Add custom hover text to rug traces
