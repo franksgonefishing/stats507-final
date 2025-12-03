@@ -1138,4 +1138,4 @@ def update_emotion_matrix(month_range, news_category_selection, network_selectio
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
