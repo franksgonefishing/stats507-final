@@ -665,12 +665,15 @@ def update_emotion_network_selector(include_generated_headlines):
     prevent_initial_call=True
 )
 def remove_inputted_ngram(_, removed_ngram, current_data):
-    ngram_ignore_df = pd.read_csv(IGNORE_NGRAMS_FILE_NAME)
-    new_ngram = pd.DataFrame({"ignored_ngrams": [removed_ngram]})
-    ngram_ignore_df = pd.concat([ngram_ignore_df, new_ngram])
-    ngram_ignore_df.to_csv(IGNORE_NGRAMS_FILE_NAME, index=False)
+    if removed_ngram == "":
+        return current_data + 1, "", ""
+    else:
+        ngram_ignore_df = pd.read_csv(IGNORE_NGRAMS_FILE_NAME)
+        new_ngram = pd.DataFrame({"ignored_ngrams": [removed_ngram]})
+        ngram_ignore_df = pd.concat([ngram_ignore_df, new_ngram])
+        ngram_ignore_df.to_csv(IGNORE_NGRAMS_FILE_NAME, index=False)
 
-    return current_data + 1, f"added '{removed_ngram}' to {IGNORE_NGRAMS_FILE_NAME}", ""
+        return current_data + 1, f"added '{removed_ngram}' to {IGNORE_NGRAMS_FILE_NAME}", ""
 
 
 ##########################################################################################
