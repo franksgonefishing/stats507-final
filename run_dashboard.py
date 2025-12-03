@@ -1,7 +1,7 @@
 from dash import Dash, html, dcc, callback, Output, Input, State
 
 from lib.hard_coded_constants import DATA_FILE_NAME, IGNORE_NGRAMS_FILE_NAME, NEWS_CATEGORIES, ADDITIONAL_STOP_WORDS, NEWS_SITES_BASE_URL, NEWS_SITE_COLORS, EMOTION_CATEGORIES, EMOTION_COLORS, GENERATED_HEADLINES_FILE_NAME
-from lib.dashboard_functions import filter_df, error_fig
+from lib.dashboard_functions import filter_df, error_fig, p_val_colors
 
 from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS
 from sklearn.preprocessing import OneHotEncoder
@@ -49,6 +49,9 @@ app = Dash(suppress_callback_exceptions=True)
 
 # high level layout for the dashboard
 app.layout = html.Div([
+    # used to refresh the correspondence analysis graph
+    # not visible in the dashboard
+    dcc.Store(id="refresh-ca-store", data=0),
     # title
     html.Div(
         children="STATS 507: Final Project Dashboard - huafrank",
@@ -269,7 +272,7 @@ def render_tab_content(tab):
                         children=[
                             # visualization on the right of the screen
                             dcc.Loading(
-                                id="loading-graph",
+                                id="loading-ca-graph",
                                 type="default",
                                 children=dcc.Graph(
                                     figure={}, 
@@ -319,7 +322,7 @@ def render_tab_content(tab):
                             ),
                             html.Br(),
                             dcc.Checklist(
-                                id="network-selection-tab2",
+                                id="network-selection-sentiment",
                                 options=[],
                                 value=[],
                                 labelStyle={"display": "block"}
@@ -327,7 +330,7 @@ def render_tab_content(tab):
                             html.Br(),
                             html.Label("[Optional] Filter headlines that contain: "),
                             dcc.Input(
-                                id="head-filter-tab2",
+                                id="head-filter-sentiment",
                                 type="text",
                                 placeholder="Enter a substring here",
                                 style={"width": "39%"},
@@ -385,7 +388,7 @@ def render_tab_content(tab):
                             month_max, 
                             1, 
                             value=[month_min, month_max], 
-                            id="months-range-selection-tab2",
+                            id="months-range-selection-sentiment",
                             marks={
                                 7: "July",
                                 8: "Aug",
@@ -401,14 +404,14 @@ def render_tab_content(tab):
                     dcc.Checklist(
                         NEWS_CATEGORIES,
                         ["politics"],
-                        id="checklist-selection-tab2"
+                        id="checklist-selection-sentiment"
                     ),
                 ]
             ),
             # GRAPHS ---------------------------------------------------------
             # scatter and rug plot at the top
             dcc.Loading(
-                id="loading-graph-2",
+                id="loading-distribution-sentiment",
                 type="default",
                 children=dcc.Graph(id="sentiment-distribution-plot"),
                 delay_show=250,
@@ -416,7 +419,7 @@ def render_tab_content(tab):
             ),
             # pairwise KS test matrix
             dcc.Loading(
-                id="loading-matrix-2",
+                id="loading-matrix-sentiment",
                 type="default",
                 children=dcc.Graph(id="sentiment-matrix"),
                 delay_show=250,
@@ -456,7 +459,7 @@ def render_tab_content(tab):
                             ),
                             html.Br(),
                             dcc.Checklist(
-                                id="network-selection-tab3",
+                                id="network-selection-emotion",
                                 options=[],
                                 value=[],
                                 labelStyle={"display": "block"}
@@ -465,7 +468,7 @@ def render_tab_content(tab):
 
                             html.Label("[Optional] Filter headlines that contain: "),
                             dcc.Input(
-                                id="head-filter-tab3",
+                                id="head-filter-emotion",
                                 type="text",
                                 placeholder="Enter a substring here",
                                 style={"width": "39%"},
@@ -522,7 +525,7 @@ def render_tab_content(tab):
                             month_max, 
                             1, 
                             value=[month_min, month_max], 
-                            id="months-range-selection-tab3",
+                            id="months-range-selection-emotion",
                             marks={
                                 7: "July",
                                 8: "Aug",
@@ -538,22 +541,22 @@ def render_tab_content(tab):
                     dcc.Checklist(
                         NEWS_CATEGORIES,
                         ["politics"],
-                        id="checklist-selection-tab3"
+                        id="checklist-selection-emotion"
                     ),
                 ]
             ),
             # GRAPHS ----------------------------------------------------------------
             # stacked bar chart
             dcc.Loading(
-                id="loading-chart-3",
+                id="loading-stacked-bar-emotion",
                 type="default",
-                children=dcc.Graph(id='emotion-stacked-bar'),
+                children=dcc.Graph(id="emotion-stacked-bar"),
                 delay_show=250,
                 delay_hide=250
             ),
             # pairwise chi-sq test matrix
             dcc.Loading(
-                id="loading-graph-3",
+                id="loading-matrix-emotion",
                 type="default",
                 children=dcc.Graph(id="emotion-matrix"),
                 delay_show=250,
@@ -565,10 +568,10 @@ def render_tab_content(tab):
 # creates the stacked bar chart for the emotions tab
 @callback(
     Output("emotion-stacked-bar", "figure"),
-    Input("months-range-selection-tab3", "value"),
-    Input("checklist-selection-tab3", "value"),
-    Input("network-selection-tab3", "value"),
-    Input("head-filter-tab3", "value"),
+    Input("months-range-selection-emotion", "value"),
+    Input("checklist-selection-emotion", "value"),
+    Input("network-selection-emotion", "value"),
+    Input("head-filter-emotion", "value"),
     Input("include-generated-headlines-emotion", "value")
 )
 def update_emotion_bar(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
@@ -616,10 +619,10 @@ def update_emotion_bar(month_range, news_category_selection, network_selection, 
 # creates the pairwise chi-sq test matrix
 @callback(
     Output("emotion-matrix", "figure"),
-    Input("months-range-selection-tab3", "value"),
-    Input("checklist-selection-tab3", "value"),
-    Input("network-selection-tab3", "value"),
-    Input("head-filter-tab3", "value"),
+    Input("months-range-selection-emotion", "value"),
+    Input("checklist-selection-emotion", "value"),
+    Input("network-selection-emotion", "value"),
+    Input("head-filter-emotion", "value"),
     Input("include-generated-headlines-emotion", "value")
 )
 def update_emotion_matrix(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
@@ -630,9 +633,9 @@ def update_emotion_matrix(month_range, news_category_selection, network_selectio
 
     pval_matrix = pd.DataFrame(index=networks, columns=networks)
 
-    for i, net1 in enumerate(networks):
-        for j, net2 in enumerate(networks):
-            if i == j:
+    for net1 in networks:
+        for net2 in networks:
+            if net1 == net2:
                 pval_matrix.loc[net1, net2] = np.nan
                 continue
             
@@ -645,22 +648,14 @@ def update_emotion_matrix(month_range, news_category_selection, network_selectio
             counts1 = counts1.reindex(all_emotions, fill_value=0)
             counts2 = counts2.reindex(all_emotions, fill_value=0)
 
-            # Remove categories where BOTH are zero (no information)
-            mask = ~((counts1 == 0) & (counts2 == 0))
-            counts1 = counts1[mask]
-            counts2 = counts2[mask]
-
-            # If only one category left → completely identical, p-value = 1.0
+            # If only one category left, p-value = 1.0
             if len(counts1) < 2:
                 pval_matrix.loc[net1, net2] = 1.0
                 continue
 
             contingency = pd.DataFrame([counts1, counts2])
 
-            # ---------------------------------------------------------
-            # ⭐ Apply pseudocount 0.5 if any zeros exist
-            #    (prevents zero expected frequencies)
-            # ---------------------------------------------------------
+            # Haldane–Anscombe correction
             if (contingency.values == 0).any():
                 contingency = contingency + 0.5
 
@@ -668,38 +663,14 @@ def update_emotion_matrix(month_range, news_category_selection, network_selectio
             _, p, _, _ = chi2_contingency(contingency)
             pval_matrix.loc[net1, net2] = p
 
-    # Define colors
-    light_blue = "rgb(173,216,230)"   # for p < 0.05
-    light_red  = "rgb(255,182,193)"   # for p ≥ 0.05
-
-    # Compute normalized breakpoint for the colorscale
-    p_min = float(np.min(pval_matrix))
-    p_max = float(np.max(pval_matrix))
-    threshold = 0.05
-
-    # Avoid division by zero
-    if p_max == p_min:
-        p_max = p_min + 1e-9
-
-    t = (threshold - p_min) / (p_max - p_min)
-    t = max(0.0, min(1.0, t))   # clamp to [0,1]
-
-    # Custom two-color colorscale with a sharp break
-    colorscale = [
-        [0.0, light_blue],
-        [t,   light_blue],
-        [t,   light_red],
-        [1.0, light_red]
-    ]
-
     # Create heatmap
     fig = px.imshow(
         pval_matrix,
         text_auto=".3f",
-        color_continuous_scale=colorscale,
-        zmin=p_min,
-        zmax=p_max,
-        labels=dict(x="Network 2", y="Network 1", color="p-value"),
+        color_continuous_scale=p_val_colors(0.05),
+        zmin=0,
+        zmax=1,
+        labels=dict(color="p-value"),
         title="Pairwise Emotion Distribution Comparison (Chi-squared p-values)"
     )
 
@@ -709,7 +680,7 @@ def update_emotion_matrix(month_range, news_category_selection, network_selectio
 # dynamic function to allow filtering on generated networks/headlines only if the option is selected
 # this one controls the VADER sentiment tab
 @callback(
-    Output("network-selection-tab2", "style"),
+    Output("network-selection-sentiment", "style"),
     Input("include-generated-headlines-sentiment", "value")
 )
 def update_sentiment_checklist_columns(show_generated):
@@ -733,7 +704,7 @@ def update_sentiment_checklist_columns(show_generated):
 # dynamic function to allow filtering on generated networks/headlines only if the option is selected
 # this one controls the emotion sentiment tab
 @callback(
-    Output("network-selection-tab3", "style"),
+    Output("network-selection-emotion", "style"),
     Input("include-generated-headlines-emotion", "value")
 )
 def update_emotion_checklist_columns(show_generated):
@@ -757,8 +728,8 @@ def update_emotion_checklist_columns(show_generated):
 # dynamic function to allow filtering on generated networks/headlines only if the option is selected
 # this one controls the VADER sentiment tab
 @callback(
-    Output("network-selection-tab2", "options"),
-    Output("network-selection-tab2", "value"),
+    Output("network-selection-sentiment", "options"),
+    Output("network-selection-sentiment", "value"),
     Input("include-generated-headlines-sentiment", "value")
 )
 def update_sentiment_network_selector(include_generated_headlines):
@@ -774,8 +745,8 @@ def update_sentiment_network_selector(include_generated_headlines):
 # dynamic function to allow filtering on generated networks/headlines only if the option is selected
 # this one controls the emotion sentiment tab
 @callback(
-    Output("network-selection-tab3", "options"),
-    Output("network-selection-tab3", "value"),
+    Output("network-selection-emotion", "options"),
+    Output("network-selection-emotion", "value"),
     Input("include-generated-headlines-emotion", "value")
 )
 def update_emotion_network_selector(include_generated_headlines):
@@ -790,63 +761,37 @@ def update_emotion_network_selector(include_generated_headlines):
 # creates the pairwise KS test matrix for the VADER sentiment tab
 @callback(
     Output("sentiment-matrix", "figure"),
-    Input("months-range-selection-tab2", "value"),
-    Input("checklist-selection-tab2", "value"),
-    Input("network-selection-tab2", "value"),
-    Input("head-filter-tab2", "value"),
+    Input("months-range-selection-sentiment", "value"),
+    Input("checklist-selection-sentiment", "value"),
+    Input("network-selection-sentiment", "value"),
+    Input("head-filter-sentiment", "value"),
     Input("include-generated-headlines-sentiment", "value")
 )
-def update_tab2_matrix(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
+def update_sentiment_matrix(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
     
     filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
     networks = filtered_df["network"].unique()
-    n = len(networks)
 
-    # Initialize empty DataFrame for the p-values
-    pval_matrix = pd.DataFrame(np.zeros((n, n)), index=networks, columns=networks)
+    pval_matrix = pd.DataFrame(index=networks, columns=networks)
 
-    for i, net1 in enumerate(networks):
-        for j, net2 in enumerate(networks):
+    for net1 in networks:
+        for net2 in networks:
             scores1 = filtered_df[filtered_df["network"] == net1]["vader_compound_score"]
             scores2 = filtered_df[filtered_df["network"] == net2]["vader_compound_score"]
             
-            if i == j:
-                pval_matrix.loc[net1, net2] = np.nan  # Optional: self-comparison is NaN
+            if net1 == net2:
+                pval_matrix.loc[net1, net2] = np.nan 
             else:
-                stat, pval = ks_2samp(scores1, scores2)
+                _, pval = ks_2samp(scores1, scores2)
                 pval_matrix.loc[net1, net2] = pval
-    
-    # Define colors
-    light_blue = "rgb(173,216,230)"   # < 0.05
-    light_red  = "rgb(255,182,193)"   # >= 0.05
-
-    # Compute normalized breakpoint for the colorscale
-    p_min = float(np.min(pval_matrix))
-    p_max = float(np.max(pval_matrix))
-    threshold = 0.05
-
-    # Avoid division issues
-    if p_max == p_min:
-        p_max = p_min + 1e-9
-
-    t = (threshold - p_min) / (p_max - p_min)
-    t = max(0.0, min(1.0, t))  # clamp
-
-    # Two-color colorscale with a sharp break
-    colorscale = [
-        [0.0, light_blue],
-        [t,   light_blue],
-        [t,   light_red],
-        [1.0, light_red]
-    ]
 
     fig = px.imshow(
         pval_matrix,
         text_auto=".3f",
-        color_continuous_scale=colorscale,
-        zmin=p_min,
-        zmax=p_max,
-        labels=dict(x="Network 2", y="Network 1", color="p-value")
+        color_continuous_scale=p_val_colors(0.05),
+        zmin=0,
+        zmax=1,
+        labels=dict(color="p-value")
     )
     
     return fig
@@ -855,13 +800,13 @@ def update_tab2_matrix(month_range, news_category_selection, network_selection, 
 # creates the density plot and rug headline viewer for the VADER tab
 @callback(
     Output("sentiment-distribution-plot", "figure"),
-    Input("months-range-selection-tab2", "value"),
-    Input("checklist-selection-tab2", "value"),
-    Input("network-selection-tab2", "value"),
-    Input("head-filter-tab2", "value"),
+    Input("months-range-selection-sentiment", "value"),
+    Input("checklist-selection-sentiment", "value"),
+    Input("network-selection-sentiment", "value"),
+    Input("head-filter-sentiment", "value"),
     Input("include-generated-headlines-sentiment", "value")
 )
-def update_tab2_graph(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
+def update_sentiment_graph(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
     
     filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
 
@@ -886,19 +831,21 @@ def update_tab2_graph(month_range, news_category_selection, network_selection, h
 
 # controls for the tool that helps remove ngrams from the analysis for the Correspondence Analysis tab
 @callback(
-    Output('container-button-basic', 'children'),
+    Output("refresh-ca-store", "data"),  # new output
+    Output("container-button-basic", "children"),
     Output("input-on-submit", "value"),
-    Input('submit-ngram-for-ignore', 'n_clicks'),
-    State('input-on-submit', 'value'),
+    Input("submit-ngram-for-ignore", "n_clicks"),
+    State("input-on-submit", "value"),
+    State("refresh-ca-store", "data"),
     prevent_initial_call=True
 )
-def update_output(n_clicks, removed_ngram):
+def update_output(_, removed_ngram, current_data):
     ngram_ignore_df = pd.read_csv(IGNORE_NGRAMS_FILE_NAME)
-    new_ngram = pd.DataFrame({'ignored_ngrams': [removed_ngram]})
+    new_ngram = pd.DataFrame({"ignored_ngrams": [removed_ngram]})
     ngram_ignore_df = pd.concat([ngram_ignore_df, new_ngram])
     ngram_ignore_df.to_csv(IGNORE_NGRAMS_FILE_NAME, index=False)
 
-    return f"added '{removed_ngram}' to {IGNORE_NGRAMS_FILE_NAME}", ""
+    return current_data + 1, f"added '{removed_ngram}' to {IGNORE_NGRAMS_FILE_NAME}", ""
 
 
 # creates the visualization for the Correspondence Analysis tab
@@ -912,9 +859,9 @@ def update_output(n_clicks, removed_ngram):
     Input(component_id="n-gram-occurrence", component_property="value"),
     Input(component_id="n-gram-single-word-filter", component_property="value"),
     Input(component_id="include-generated-headlines-ca", component_property="value"),
-    Input(component_id="submit-ngram-for-ignore", component_property="n_clicks")
+    Input(component_id="refresh-ca-store", component_property="data")
 )
-def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams, n_gram_value, n_gram_occurrence_filter, headline_filter, include_generated_headlines, filler):
+def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams, n_gram_value, n_gram_occurrence_filter, headline_filter, include_generated_headlines, _):
     stop_words = list(ENGLISH_STOP_WORDS.union(ADDITIONAL_STOP_WORDS))
     n_gram_occurrence_filter = n_gram_occurrence_filter or 5
     if ignore_preselected_ngrams:

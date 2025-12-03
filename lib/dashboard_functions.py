@@ -41,3 +41,17 @@ def error_fig(error_msg):
     )
 
     return fig
+
+
+# return a matrix to provide color split between significant and not significant p-values
+def p_val_colors(p_val_cutoff):
+
+    light_blue = "rgb(173,216,230)"   # for p < 0.05
+    light_red  = "rgb(255,182,193)"   # for p ≥ 0.05
+
+    return [
+        [0.0, light_blue],
+        [p_val_cutoff,   light_blue],
+        [p_val_cutoff,   light_red],
+        [1.0, light_red]
+    ]
