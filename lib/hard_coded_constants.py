@@ -109,3 +109,13 @@ INT_TO_MONTH_DICT = {
     11: "november",
     12: "december"
 }
+
+EMOTION_COLORS = {
+    "joy": "#FFD93D",        # bright golden yellow — warm, uplifting
+    "sadness": "#4973C2",    # deep cool blue — heavy, reflective
+    "anger": "#D7263D",      # intense red — hot, aggressive
+    "fear": "#5C5470",       # dark violet-gray — tense, ominous
+    "disgust": "#6B6F2B",   # muddy green-brown, very “rotting plant” vibe
+    "neutral": "#BEBEBE",    # soft gray — balanced, emotionless
+    "surprise": "#FF8C42",   # vibrant orange — sudden, attention-grabbing
+}
