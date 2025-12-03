@@ -1,6 +1,6 @@
 from dash import Dash, html, dcc, callback, Output, Input, State
 
-from lib.hard_coded_constants import DATA_FILE_NAME, IGNORE_NGRAMS_FILE_NAME, NEWS_CATEGORIES, ADDITIONAL_STOP_WORDS, NEWS_SITES_BASE_URL, NEWS_SITE_COLORS, EMOTION_CATEGORIES, EMOTION_COLORS, GENERATED_HEADLINES_FILE_NAME
+from lib.hard_coded_constants import DATA_FILE_NAME, IGNORE_NGRAMS_FILE_NAME, NEWS_CATEGORIES, NEWS_SITES_BASE_URL, NEWS_SITE_COLORS, EMOTION_CATEGORIES, EMOTION_COLORS, GENERATED_HEADLINES_FILE_NAME
 from lib.dashboard_functions import filter_df, error_fig, p_val_colors
 
 from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS
@@ -94,6 +94,9 @@ app.layout = html.Div([
     html.Div(id="tabs-content")
 ])
 
+##########################################################################################
+# BEGIN TAB DISPLAY FORMATTING
+##########################################################################################
 
 # adjusts the displayed content depending on the selected tab
 LEFT_COL_WIDTH = "30%"
@@ -563,119 +566,14 @@ def render_tab_content(tab):
                 delay_hide=250
             ),
         ])
+##########################################################################################
+# END TAB DISPLAY FORMATTING
+##########################################################################################
 
 
-# creates the stacked bar chart for the emotions tab
-@callback(
-    Output("emotion-stacked-bar", "figure"),
-    Input("months-range-selection-emotion", "value"),
-    Input("checklist-selection-emotion", "value"),
-    Input("network-selection-emotion", "value"),
-    Input("head-filter-emotion", "value"),
-    Input("include-generated-headlines-emotion", "value")
-)
-def update_emotion_bar(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
-    
-    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
-
-    # find % of emotion per network
-    emotion_df = pd.crosstab(filtered_df["network"], filtered_df["primary_emotion"])
-    emotion_df = emotion_df.div(emotion_df.sum(axis=1), axis=0).reset_index()
-    emotion_df = emotion_df.melt(
-        id_vars="network", 
-        var_name="primary_emotion", 
-        value_name="percentage"
-    )
-    emotion_df["percentage"] = emotion_df["percentage"] * 100
-
-    # create the graph
-    fig = px.bar(
-        emotion_df,
-        x="network",
-        y="percentage",
-        color="primary_emotion",
-        text="percentage",
-        title="Percentage of Each Emotion by Network",
-        labels={
-            "percentage": "Percent",
-            "network": "Network", 
-            "primary_emotion": "Emotion"
-        },
-        color_discrete_map=EMOTION_COLORS
-    )
-    fig.update_traces(
-        texttemplate="%{text:.1f}%",
-        hovertemplate="Emotion: %{fullData.name}<br>"
-                      "Network: %{x}<br>"
-                      "Percentage: %{y:.1f}<br>"
-                      "<extra></extra>",
-        cliponaxis=False
-    )
-    fig.update_layout(barmode="stack")
-
-    return fig
-
-
-# creates the pairwise chi-sq test matrix
-@callback(
-    Output("emotion-matrix", "figure"),
-    Input("months-range-selection-emotion", "value"),
-    Input("checklist-selection-emotion", "value"),
-    Input("network-selection-emotion", "value"),
-    Input("head-filter-emotion", "value"),
-    Input("include-generated-headlines-emotion", "value")
-)
-def update_emotion_matrix(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
-    
-    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
-
-    networks = filtered_df["network"].unique()
-
-    pval_matrix = pd.DataFrame(index=networks, columns=networks)
-
-    for net1 in networks:
-        for net2 in networks:
-            if net1 == net2:
-                pval_matrix.loc[net1, net2] = np.nan
-                continue
-            
-            # Count primary emotions for each network
-            counts1 = filtered_df[filtered_df["network"] == net1]["primary_emotion"].value_counts()
-            counts2 = filtered_df[filtered_df["network"] == net2]["primary_emotion"].value_counts()
-            
-            # Align with full emotion category list
-            all_emotions = EMOTION_CATEGORIES
-            counts1 = counts1.reindex(all_emotions, fill_value=0)
-            counts2 = counts2.reindex(all_emotions, fill_value=0)
-
-            # If only one category left, p-value = 1.0
-            if len(counts1) < 2:
-                pval_matrix.loc[net1, net2] = 1.0
-                continue
-
-            contingency = pd.DataFrame([counts1, counts2])
-
-            # Haldane–Anscombe correction
-            if (contingency.values == 0).any():
-                contingency = contingency + 0.5
-
-            # Run chi-square
-            _, p, _, _ = chi2_contingency(contingency)
-            pval_matrix.loc[net1, net2] = p
-
-    # Create heatmap
-    fig = px.imshow(
-        pval_matrix,
-        text_auto=".3f",
-        color_continuous_scale=p_val_colors(0.05),
-        zmin=0,
-        zmax=1,
-        labels=dict(color="p-value"),
-        title="Pairwise Emotion Distribution Comparison (Chi-squared p-values)"
-    )
-
-    return fig
-
+##########################################################################################
+# BEGIN FILTER OPTION CALLBACKS
+##########################################################################################
 
 # dynamic function to allow filtering on generated networks/headlines only if the option is selected
 # this one controls the VADER sentiment tab
@@ -741,7 +639,6 @@ def update_sentiment_network_selector(include_generated_headlines):
     return network_selection[include_generated_headlines], only_real_network_list
 
 
-
 # dynamic function to allow filtering on generated networks/headlines only if the option is selected
 # this one controls the emotion sentiment tab
 @callback(
@@ -758,77 +655,6 @@ def update_emotion_network_selector(include_generated_headlines):
     return network_selection[include_generated_headlines], only_real_network_list
 
 
-# creates the pairwise KS test matrix for the VADER sentiment tab
-@callback(
-    Output("sentiment-matrix", "figure"),
-    Input("months-range-selection-sentiment", "value"),
-    Input("checklist-selection-sentiment", "value"),
-    Input("network-selection-sentiment", "value"),
-    Input("head-filter-sentiment", "value"),
-    Input("include-generated-headlines-sentiment", "value")
-)
-def update_sentiment_matrix(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
-    
-    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
-    networks = filtered_df["network"].unique()
-
-    pval_matrix = pd.DataFrame(index=networks, columns=networks)
-
-    for net1 in networks:
-        for net2 in networks:
-            scores1 = filtered_df[filtered_df["network"] == net1]["vader_compound_score"]
-            scores2 = filtered_df[filtered_df["network"] == net2]["vader_compound_score"]
-            
-            if net1 == net2:
-                pval_matrix.loc[net1, net2] = np.nan 
-            else:
-                _, pval = ks_2samp(scores1, scores2)
-                pval_matrix.loc[net1, net2] = pval
-
-    fig = px.imshow(
-        pval_matrix,
-        text_auto=".3f",
-        color_continuous_scale=p_val_colors(0.05),
-        zmin=0,
-        zmax=1,
-        labels=dict(color="p-value")
-    )
-    
-    return fig
-
-
-# creates the density plot and rug headline viewer for the VADER tab
-@callback(
-    Output("sentiment-distribution-plot", "figure"),
-    Input("months-range-selection-sentiment", "value"),
-    Input("checklist-selection-sentiment", "value"),
-    Input("network-selection-sentiment", "value"),
-    Input("head-filter-sentiment", "value"),
-    Input("include-generated-headlines-sentiment", "value")
-)
-def update_sentiment_graph(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
-    
-    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
-
-    networks = filtered_df["network"].unique()
-    data = [filtered_df[filtered_df["network"] == network]["vader_compound_score"] for network in networks]
-    colors = [NEWS_SITE_COLORS[network] for network in networks]
-
-    fig = ff.create_distplot(data, networks, show_hist=False, colors=colors)
-    fig.update_layout(title="Sentiment Density Distribution Plot")
-    fig.update_yaxes(visible=False)
-    # Add custom hover text to rug traces
-    # Rug traces are usually the last 'len(networks)' traces in the figure
-    for i, network in enumerate(networks):
-        rug_trace_index = -len(networks) + i  # Get correct trace
-        rug_headlines = filtered_df[filtered_df["network"] == network]["headline"]
-
-        fig.data[rug_trace_index].text = rug_headlines
-        fig.data[rug_trace_index].hovertemplate = "%{text}<br>Score: %{x}<extra></extra>"
-
-    return fig
-
-
 # controls for the tool that helps remove ngrams from the analysis for the Correspondence Analysis tab
 @callback(
     Output("refresh-ca-store", "data"),  # new output
@@ -839,7 +665,7 @@ def update_sentiment_graph(month_range, news_category_selection, network_selecti
     State("refresh-ca-store", "data"),
     prevent_initial_call=True
 )
-def update_output(_, removed_ngram, current_data):
+def remove_inputted_ngram(_, removed_ngram, current_data):
     ngram_ignore_df = pd.read_csv(IGNORE_NGRAMS_FILE_NAME)
     new_ngram = pd.DataFrame({"ignored_ngrams": [removed_ngram]})
     ngram_ignore_df = pd.concat([ngram_ignore_df, new_ngram])
@@ -848,22 +674,34 @@ def update_output(_, removed_ngram, current_data):
     return current_data + 1, f"added '{removed_ngram}' to {IGNORE_NGRAMS_FILE_NAME}", ""
 
 
+##########################################################################################
+# END FILTER OPTION CALLBACKS
+##########################################################################################
+
+
+##########################################################################################
+# BEGIN CORRESPONDENCE ANALYSIS TAB VISUALIZATIONS
+##########################################################################################
+
+
 # creates the visualization for the Correspondence Analysis tab
 @callback(
-    Output(component_id="controls-and-graph", component_property="figure"),
-    Input(component_id="ignore-preselected-ngrams", component_property="value"),
-    Input(component_id="months-range-selection", component_property="value"),
-    Input(component_id="checklist-selection", component_property="value"),
-    Input(component_id="show-ngrams-ca", component_property="value"),
-    Input(component_id="n-gram-selection", component_property="value"),
-    Input(component_id="n-gram-occurrence", component_property="value"),
-    Input(component_id="n-gram-single-word-filter", component_property="value"),
-    Input(component_id="include-generated-headlines-ca", component_property="value"),
-    Input(component_id="refresh-ca-store", component_property="data")
+    Output("controls-and-graph", "figure"),
+    Input("ignore-preselected-ngrams", "value"),
+    Input("months-range-selection", "value"),
+    Input("checklist-selection", "value"),
+    Input("show-ngrams-ca", "value"),
+    Input("n-gram-selection", "value"),
+    Input("n-gram-occurrence", "value"),
+    Input("n-gram-single-word-filter", "value"),
+    Input("include-generated-headlines-ca", "value"),
+    Input("refresh-ca-store", "data")
 )
 def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams, n_gram_value, n_gram_occurrence_filter, headline_filter, include_generated_headlines, _):
-    stop_words = list(ENGLISH_STOP_WORDS.union(ADDITIONAL_STOP_WORDS))
+    
+    # so that if the input is None when the user is changing the value, the value will be at least 5
     n_gram_occurrence_filter = n_gram_occurrence_filter or 5
+
     if ignore_preselected_ngrams:
         IGNORE_NGRAMS = np.array(pd.read_csv(IGNORE_NGRAMS_FILE_NAME)["ignored_ngrams"])
     else:
@@ -871,27 +709,33 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
 
     filtered_df = filter_df(df, month_range=month_range, news_category_selection=col_chosen, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
 
+    # filters are too specific and there's no headlines
     if len(filtered_df) == 0:
         return error_fig("No data available")
 
-    try:
-        vectorizer = CountVectorizer(
-            ngram_range=(n_gram_value[0], n_gram_value[1]),
-            stop_words=stop_words, 
-            min_df=n_gram_occurrence_filter
-        )
-        X = vectorizer.fit_transform(filtered_df["headline"])
-    except ValueError:
-        return error_fig("Too few headlines available for analysis")
+    # get the ngrams from the headlines
+    vectorizer = CountVectorizer(
+        ngram_range=(n_gram_value[0], n_gram_value[1]),
+        stop_words=list(ENGLISH_STOP_WORDS), 
+        min_df=n_gram_occurrence_filter
+    )
+    # X is a matrix of headlines on one axis, ngrams on the other axis
+    X = vectorizer.fit_transform(filtered_df["headline"])
+    
+    # remove ngrams that are in ignore_these_ngrams.csv
+    # some ngrams are unique to networks because they are self-referential
+    # or some standard label, like "fox news digital"
+    # these ngrams skew uniqueness for each network so the analysis is better when removed
     feature_names = vectorizer.get_feature_names_out()
-
     mask = np.isin(feature_names, IGNORE_NGRAMS, invert=True)
     X = X[:, mask]
     feature_names = feature_names[mask]
 
+    # the same as groupby
+    # groups ngram usage by network, original X matrix is ngrams by headline
     networks = filtered_df["network"].to_numpy().reshape(len(filtered_df["network"]), 1)
-    enc = OneHotEncoder(sparse_output=True)  # keep it sparse
-    G = enc.fit_transform(networks)          # shape: (n_docs × n_networks)
+    enc = OneHotEncoder(sparse_output=True)  # keep it sparse for speed
+    G = enc.fit_transform(networks)
     CT = X.T @ G 
 
     network_names = enc.categories_[0]
@@ -937,10 +781,11 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     except InvalidParameterError:
         error_fig("Too few headlines available for analysis")
 
-    # Preferred reference network
+    # preferred reference network, will anchor this to always be in the top left quadrant
+    # keeps the graph stabalized
     preferred_ref = "NYT"
 
-    # Choose NYT if available, else fallback to first available
+    # if "NYT" not in the data, fallback to first available network
     if preferred_ref in network_names:
         network_ref = preferred_ref
     else:
@@ -962,8 +807,6 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
         col_coords.iloc[:, 1] *= -1
         row_coords.iloc[:, 1] *= -1
 
-    fig = go.Figure()
-
     # Define colors
     base_color = "#E41A1C"        # red (for original networks)
     generated_color = "#377EB8"   # blue (colorblind-friendly distinct color)
@@ -978,8 +821,6 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     row_coords_scaled.iloc[:,0] *= scale_factor
     row_coords_scaled.iloc[:,1] *= scale_factor
 
-    # Scatter plot
-    fig = go.Figure()
     # Boolean mask for which points are generated
     is_generated = [("_generated" in name) for name in network_names]
 
@@ -992,6 +833,7 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     y_base = col_coords.iloc[:, 1][~pd.Series(is_generated)]
     text_base = [name for name in network_names if "_generated" not in name]
 
+    fig = go.Figure()
 
     # --- TRACE 1: Generated ---
     fig.add_trace(go.Scatter(
@@ -1022,11 +864,11 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
         fig.add_trace(go.Scatter(
             x=row_coords_scaled.iloc[:,0],
             y=row_coords_scaled.iloc[:,1],
-            mode='markers',
-            text=feature_names,  # We'll annotate top ones manually
+            mode="markers",
+            text=feature_names,
             hoverinfo="text",
             marker=dict(size=4, color='blue', opacity=0.2),
-            name='n-grams'
+            name="n-grams"
         ))
         fig.add_trace(
             go.Scatter(
@@ -1071,6 +913,233 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     fig.update_traces(cliponaxis=False)
 
     return fig
+
+
+##########################################################################################
+# END CORRESPONDENCE ANALYSIS TAB VISUALIZATIONS
+##########################################################################################
+
+
+##########################################################################################
+# BEGIN SENTIMENT ANALYSIS TAB VISUALIZATIONS
+##########################################################################################
+
+
+# creates the density plot and rug headline viewer for the VADER tab
+@callback(
+    Output("sentiment-distribution-plot", "figure"),
+    Input("months-range-selection-sentiment", "value"),
+    Input("checklist-selection-sentiment", "value"),
+    Input("network-selection-sentiment", "value"),
+    Input("head-filter-sentiment", "value"),
+    Input("include-generated-headlines-sentiment", "value")
+)
+def update_sentiment_graph(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
+    
+    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
+
+    # filters are too specific and there's no headlines
+    if len(filtered_df) == 0:
+        return error_fig("No data available")
+
+    networks = filtered_df["network"].unique()
+    data = [filtered_df[filtered_df["network"] == network]["vader_compound_score"] for network in networks]
+    colors = [NEWS_SITE_COLORS[network] for network in networks]
+
+    fig = ff.create_distplot(data, networks, show_hist=False, colors=colors)
+    fig.update_layout(title="Sentiment Density Distribution Plot")
+    fig.update_yaxes(visible=False)
+    # Add custom hover text to rug traces
+    # Rug traces are usually the last 'len(networks)' traces in the figure
+    for i, network in enumerate(networks):
+        rug_trace_index = -len(networks) + i  # Get correct trace
+        rug_headlines = filtered_df[filtered_df["network"] == network]["headline"]
+
+        fig.data[rug_trace_index].text = rug_headlines
+        fig.data[rug_trace_index].hovertemplate = "%{text}<br>Score: %{x}<extra></extra>"
+
+    return fig
+
+
+# creates the pairwise KS test matrix for the VADER sentiment tab
+@callback(
+    Output("sentiment-matrix", "figure"),
+    Input("months-range-selection-sentiment", "value"),
+    Input("checklist-selection-sentiment", "value"),
+    Input("network-selection-sentiment", "value"),
+    Input("head-filter-sentiment", "value"),
+    Input("include-generated-headlines-sentiment", "value")
+)
+def update_sentiment_matrix(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
+    
+    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
+    
+    # filters are too specific and there's no headlines
+    if len(filtered_df) == 0:
+        return error_fig("No data available")
+    
+    networks = filtered_df["network"].unique()
+
+    pval_matrix = pd.DataFrame(index=networks, columns=networks)
+
+    for net1 in networks:
+        for net2 in networks:
+            scores1 = filtered_df[filtered_df["network"] == net1]["vader_compound_score"]
+            scores2 = filtered_df[filtered_df["network"] == net2]["vader_compound_score"]
+            
+            if net1 == net2:
+                pval_matrix.loc[net1, net2] = np.nan 
+            else:
+                _, pval = ks_2samp(scores1, scores2)
+                pval_matrix.loc[net1, net2] = pval
+
+    fig = px.imshow(
+        pval_matrix,
+        text_auto=".3f",
+        color_continuous_scale=p_val_colors(0.05),
+        zmin=0,
+        zmax=1,
+        labels=dict(color="p-value"),
+        title="Pairwise Sentiment Distribution Comparison (KS p-values)"
+    )
+    
+    return fig
+
+
+##########################################################################################
+# END SENTIMENT ANALYSIS TAB VISUALIZATIONS
+##########################################################################################
+
+
+##########################################################################################
+# BEGIN EMOTION ANALYSIS TAB VISUALIZATIONS
+##########################################################################################
+
+
+# creates the stacked bar chart for the emotions tab
+@callback(
+    Output("emotion-stacked-bar", "figure"),
+    Input("months-range-selection-emotion", "value"),
+    Input("checklist-selection-emotion", "value"),
+    Input("network-selection-emotion", "value"),
+    Input("head-filter-emotion", "value"),
+    Input("include-generated-headlines-emotion", "value")
+)
+def update_emotion_bar(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
+    
+    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
+
+    # filters are too specific and there's no headlines
+    if len(filtered_df) == 0:
+        return error_fig("No data available")
+    
+    # find % of emotion per network
+    emotion_df = pd.crosstab(filtered_df["network"], filtered_df["primary_emotion"])
+    emotion_df = emotion_df.div(emotion_df.sum(axis=1), axis=0).reset_index()
+    emotion_df = emotion_df.melt(
+        id_vars="network", 
+        var_name="primary_emotion", 
+        value_name="percentage"
+    )
+    emotion_df["percentage"] = emotion_df["percentage"] * 100
+
+    # create the graph
+    fig = px.bar(
+        emotion_df,
+        x="network",
+        y="percentage",
+        color="primary_emotion",
+        text="percentage",
+        title="Percentage of Each Emotion by Network",
+        labels={
+            "percentage": "Percent",
+            "network": "Network", 
+            "primary_emotion": "Emotion"
+        },
+        color_discrete_map=EMOTION_COLORS
+    )
+    fig.update_traces(
+        texttemplate="%{text:.1f}%",
+        hovertemplate="Emotion: %{fullData.name}<br>"
+                      "Network: %{x}<br>"
+                      "Percentage: %{y:.1f}<br>"
+                      "<extra></extra>",
+        cliponaxis=False
+    )
+    fig.update_layout(barmode="stack")
+
+    return fig
+
+
+# creates the pairwise chi-sq test matrix
+@callback(
+    Output("emotion-matrix", "figure"),
+    Input("months-range-selection-emotion", "value"),
+    Input("checklist-selection-emotion", "value"),
+    Input("network-selection-emotion", "value"),
+    Input("head-filter-emotion", "value"),
+    Input("include-generated-headlines-emotion", "value")
+)
+def update_emotion_matrix(month_range, news_category_selection, network_selection, headline_filter, include_generated_headlines):
+    
+    filtered_df = filter_df(df, month_range=month_range, news_category_selection=news_category_selection, network_selection=network_selection, headline_contains=headline_filter, include_generated_headlines=include_generated_headlines)
+
+    # filters are too specific and there's no headlines
+    if len(filtered_df) == 0:
+        return error_fig("No data available")
+
+    networks = filtered_df["network"].unique()
+
+    pval_matrix = pd.DataFrame(index=networks, columns=networks)
+
+    for net1 in networks:
+        for net2 in networks:
+            if net1 == net2:
+                pval_matrix.loc[net1, net2] = np.nan
+                continue
+            
+            # Count primary emotions for each network
+            counts1 = filtered_df[filtered_df["network"] == net1]["primary_emotion"].value_counts()
+            counts2 = filtered_df[filtered_df["network"] == net2]["primary_emotion"].value_counts()
+            
+            # Align with full emotion category list
+            all_emotions = EMOTION_CATEGORIES
+            counts1 = counts1.reindex(all_emotions, fill_value=0)
+            counts2 = counts2.reindex(all_emotions, fill_value=0)
+
+            # If only one category left, p-value = 1.0
+            if len(counts1) < 2:
+                pval_matrix.loc[net1, net2] = 1.0
+                continue
+
+            contingency = pd.DataFrame([counts1, counts2])
+
+            # Haldane–Anscombe correction
+            if (contingency.values == 0).any():
+                contingency = contingency + 0.5
+
+            # Run chi-square
+            _, p, _, _ = chi2_contingency(contingency)
+            pval_matrix.loc[net1, net2] = p
+
+    # Create heatmap
+    fig = px.imshow(
+        pval_matrix,
+        text_auto=".3f",
+        color_continuous_scale=p_val_colors(0.05),
+        zmin=0,
+        zmax=1,
+        labels=dict(color="p-value"),
+        title="Pairwise Emotion Distribution Comparison (Chi-squared p-values)"
+    )
+
+    return fig
+
+
+##########################################################################################
+# END EMOTION ANALYSIS TAB VISUALIZATIONS
+##########################################################################################
+
 
 if __name__ == "__main__":
     app.run(debug=True)

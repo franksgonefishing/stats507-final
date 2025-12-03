@@ -23,8 +23,6 @@ DATA_FILE_NAME = "data/headlines_data.csv"
 
 IGNORE_NGRAMS_FILE_NAME = "data/ignore_these_ngrams.csv"
 
-ADDITIONAL_STOP_WORDS = []
-
 NEWS_CATEGORY_CLASSIFICATION_MODEL = "facebook/bart-large-mnli"
 
 EMOTION_ANALYSIS_CLASSIFICATION_MODEL = "michellejieli/emotion_text_classifier"
