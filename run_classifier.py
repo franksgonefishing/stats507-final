@@ -4,6 +4,7 @@ import calendar
 import argparse
 from datetime import date
 
+# please be sure to run this from the stats507-final directory
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sites", type=str, nargs="+", required=True, choices=list(news_sites.NEWS_SITES_BASE_URL.keys()) + ["ALL"])

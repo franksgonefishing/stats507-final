@@ -4,6 +4,7 @@ import calendar
 import argparse
 from datetime import date
 
+# please be sure to run this from the stats507-final directory
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--analysis_type", type=str, nargs="+", required=True, choices=["pos_neg_neu", "emotion", "ALL"])

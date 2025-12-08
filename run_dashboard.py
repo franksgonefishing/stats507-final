@@ -743,7 +743,7 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     # the same as groupby
     # groups ngram usage by network, original X matrix is ngrams by headline
     networks = filtered_df["network"].to_numpy().reshape(len(filtered_df["network"]), 1)
-    enc = OneHotEncoder(sparse_output=True)  # keep it sparse for speed
+    enc = OneHotEncoder(sparse_output=True)
     G = enc.fit_transform(networks)
     CT = X.T @ G 
 
@@ -780,8 +780,8 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
         # sometimes an error can pop up if there's only one network remaining even when the earlier checks don't pop an error
         return error_fig("Too few n-grams to analyze")
 
-    # will anchor this to always be in the top left quadrant
-    # keeps the graph stabalized
+    # will anchor a specific network to always be in the top left quadrant
+    # keeps the graph stabilized
     preferred_ref = "NYT"
 
     # if "NYT" not in the data, fallback to first available network
@@ -796,12 +796,12 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     ref_x = col_coords.iloc[ref_idx, 0]
     ref_y = col_coords.iloc[ref_idx, 1]
 
-    # flip x-axis if ref_x > 0
+    # flip x-axis if ref_x > 0, top left is neg in x-axis
     if ref_x > 0:
         col_coords.iloc[:, 0] *= -1
         row_coords.iloc[:, 0] *= -1
 
-    # flip y-axis if ref_y < 0
+    # flip y-axis if ref_y < 0, top left is pos in y-axis
     if ref_y < 0:
         col_coords.iloc[:, 1] *= -1
         row_coords.iloc[:, 1] *= -1
@@ -817,12 +817,11 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     row_coords_scaled.iloc[:, 1] *= scale_factor
 
     # create separate colored points for generated networks vs base networks
-    # Define colors for base networks vs generated networks
     base_color = "#E41A1C"
     generated_color = "#377EB8"
-    # Boolean mask for which points are generated
+    # boolean mask for which points are generated
     is_generated = np.array([("_generated" in name) for name in network_names])
-    # Split the data
+    # split the data
     x_gen = col_coords.iloc[:, 0][is_generated]
     y_gen = col_coords.iloc[:, 1][is_generated]
     text_gen = [name for name in network_names if "_generated" in name]
@@ -831,7 +830,7 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     text_base = [name for name in network_names if "_generated" not in name]
 
     fig = go.Figure()
-    # --- TRACE 1: Generated ---
+
     fig.add_trace(go.Scatter(
         x=x_gen,
         y=y_gen,
@@ -843,7 +842,6 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
         name='generated_headlines',
     ))
 
-    # --- TRACE 2: Base (Non-generated) ---
     fig.add_trace(go.Scatter(
         x=x_base,
         y=y_base,
@@ -856,7 +854,6 @@ def update_graph(ignore_preselected_ngrams, month_range, col_chosen, show_ngrams
     ))
 
     if show_ngrams:
-        # Scatter for n-grams
         fig.add_trace(go.Scatter(
             x=row_coords_scaled.iloc[:,0],
             y=row_coords_scaled.iloc[:,1],
