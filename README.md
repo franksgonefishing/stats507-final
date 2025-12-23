@@ -86,6 +86,6 @@ example:
 Notebook that fine-tunes language models for all the news networks and generates headlines based on the fine-tuned models. No need to make any changes, "run all" should work. Should take ~20 minutes on CPU.
 
 ## Other Notes
-For the scraper, some of the networks require opening a chromium browser to find the html. Sometimes the bot protection kicks in chromium doesn't direct to the page with the headline html. When this happens just try running the scraper again later.
+For the scraper, some of the networks require opening a chromium browser to find the html. Sometimes the bot protection kicks in and chromium doesn't direct to the page with the headline html. When this happens just try running the scraper again later.
 
 Fine-tuning the language model will create 9 separate fairly large folders in stats507-final directory. I would recommend deleting them. I made the mistake of trying to upload everything into my repo and it caused a mess because the folders were way too large. This is why when actually generating the headlines, I have the notebook use the fine-tuned models I already uploaded to huggingface rather than any local versions that are created.
