@@ -30,7 +30,7 @@ args:
 * --year (required) Enter an int between 2001 and 2025
 * --month (required) Enter an int between 1 and 12
 * --day [OPTIONAL] Enter an int to scrape a specific day, otherwise all days in the month will be scraped
-* --ignore_sites [OPTIONAL] Enter sites to ignore scraping, often used in conjunction will --sites ALL
+* --ignore_sites [OPTIONAL] Enter sites to ignore scraping, often used in conjunction with --sites ALL
 * --delete_headlines [OPTIONAL] Enter True to delete rows for the specified inputs, avoids having to do this in the CSV
 
 
@@ -47,7 +47,7 @@ args:
 * --year (required) Enter an int between 2001 and 2025
 * --month (required) Enter an int between 1 and 12
 * --day [OPTIONAL] Enter an int to run for a specific day, otherwise all days in the month will be run
-* --ignore_sites [OPTIONAL] Enter sites to ignore during the run, often used in conjunction will --sites ALL
+* --ignore_sites [OPTIONAL] Enter sites to ignore during the run, often used in conjunction with --sites ALL
 
 
 example:
@@ -63,7 +63,7 @@ args:
 * --year (required) Enter an int between 2001 and 2025
 * --month (required) Enter an int between 1 and 12
 * --day [OPTIONAL] Enter an int to run for a specific day, otherwise all days in the month will be run
-* --ignore_sites [OPTIONAL] Enter sites to ignore during the run, often used in conjunction will --sites ALL
+* --ignore_sites [OPTIONAL] Enter sites to ignore during the run, often used in conjunction with --sites ALL
 * --use_generated_headlines [OPTIONAL] Enter True to run this on headlines generated from the language models
 
 
